@@ -1,0 +1,68 @@
+<system_role>
+You are a Principal Data Platform Architect and Lead Full-Stack Engineer specializing in enterprise data governance, pipeline observability, AST-based code parsing, and scale data platform design (supporting Databricks, Apache Spark, and modern lakehouses).
+</system_role>
+
+<context>
+We are engineering "MetaWeave" — a high-performance, enterprise-grade web application designed for end-to-end data pipeline tracking, runbook operationalization, AST lineage extraction, impact analysis (Blast Radius/RCA), and natural language querying over pipeline metadata.
+
+MetaWeave operates at true enterprise scale, supporting over 1,000+ concurrent multi-task jobs, complex DAG dependencies, and many-to-many table mapping scenarios (e.g., multiple jobs writing to one target for reconciliation, or single jobs loading dozens of downstream tables).
+</context>
+
+<task>
+Act as our Lead Architect and Technical Lead. Produce a complete, production-ready blueprint, data models, AST parser engine code samples, and front-end UI spec for building MetaWeave.
+
+Structure your response into the following clear, actionable sections:
+</task>
+
+<technical_specifications>
+
+  <section name="1. System Architecture & Component Design">
+    - Architectural diagram or system topology (Frontend, API Layer, Ingestion Engine, Lineage Parser, Metadata Store, Vector/NL Engine).
+    - Deep integration with Databricks Jobs API, Unity Catalog System Tables (`system.access.table_lineage`, `system.access.column_lineage`), and Delta Lake metadata.
+  </section>
+
+  <section name="2. Enterprise Metadata Schema (DDL & Entity Models)">
+    Provide production-grade PostgreSQL / SQL DDL scripts including primary keys, foreign keys, indexes, and JSONB payloads for the following core metadata tables:
+    - `Workflow_definition` (Orchestration groups, ownership, SLAs)
+    - `Job_definition` (Job-level configs, retries, concurrency)
+    - `Job_dag` (Graph edges between jobs and external triggers)
+    - `Task_definition` (Task-level exec specs, environment, script pointers)
+    - `Job_audit` (Execution runs, duration, status, logs, rows processed)
+    - `Job_dependency` (Upstream/downstream task & dataset dependencies)
+    - `Job_alert` (SLA breaches, failure notification DLs, routing rules)
+  </section>
+
+  <section name="3. Runbook & Monitoring UI/UX Specifications">
+    - **Runbook Display:** Team workspace views detailing workflows, active jobs, nested task DAGs, code viewer (SQL/PySpark), schedule cron expressions, and email Distribution Lists (DLs).
+    - **Operational Monitoring Dashboard:** SLA status, execution trends, error rates, queue latency, and cost tracking across clusters.
+  </section>
+
+  <section name="4. Lineage & Blast Radius / RCA Engine">
+    - **Blast Radius & RCA Graph:** Visualizing upstream dependencies (Root Cause Analysis) and downstream impact propagation when a task fails or data drift occurs.
+    - **Lineage Depth:** Support for 3 distinct lineage tiers:
+      1. *Table Lineage:* Source-to-target dataset dependencies.
+      2. *Attribute / Column Lineage:* Field-level transformations and data flow.
+      3. *Temporal Lineage:* How lineage evolves over time across historical pipeline runs.
+    - **Code Parser (Python Sample):** Provide a working Python module using `sqlglot` or AST tree manipulation to parse SQL (SELECT, INSERT, MERGE, CREATE TABLE AS) and PySpark scripts to extract source-target column mappings automatically.
+  </section>
+
+  <section name="5. High-Scale Validation & Benchmarking Strategy (1,000+ Jobs)">
+    - Define a test/simulation strategy to validate graph query performance over:
+      * 1,000+ active multi-task jobs with 10,000+ tasks.
+      * Many-to-one reconciliation datasets (multiple jobs loading into 1 table).
+      * One-to-many fan-out pipelines (1 job updating 20+ tables).
+    - Provide optimized graph traversal queries (Recursive CTEs or Cypher / NetworkX logic) that execute under 100ms.
+  </section>
+
+  <section name="6. Natural Language Query Engine (Text-to-Metadata & Lineage)">
+    - Architecture for converting natural language queries (e.g., *"Which downstream reporting tables will be affected if the churn_prediction job fails?"* or *"Show me all PySpark jobs that touched the customer_dim table this week"*) into structured SQL/Graph queries against the MetaWeave schema.
+    - Provide prompt template definitions and tool-calling interfaces for LLM-based metadata search.
+  </section>
+
+</technical_specifications>
+
+<formatting_instructions>
+- Write fully functional code snippets and standard SQL DDLs (no placeholder or dummy code).
+- Use clear markdown headers, tables, and code fences.
+- Maintain an enterprise, production-ready tone focused on performance, reliability, and scale.
+</formatting_instructions>

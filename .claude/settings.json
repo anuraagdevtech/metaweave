@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(lsof -ti:8000 -sTCP:LISTEN)",
+      "Bash(xargs -r kill)",
+      "Bash(rm -f \"/Users/anuraagb/Library/CloudStorage/OneDrive-Personal/projects/metaweave/backend/metaweave.db\")",
+      "Bash(chromium-cli --help)",
+      "Bash(python3 -c \"import playwright\")",
+      "Bash(npm ls *)"
+    ]
+  }
+}

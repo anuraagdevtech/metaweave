@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "../api/client";
+import { EmptyState } from "../components/EmptyState";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { Spinner } from "../components/Spinner";
 import type { LineageResult } from "../api/types";
@@ -22,6 +23,15 @@ export function Lineage() {
   const [results, setResults] = useState<LineageResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [resultView, setResultView] = useState<"table" | "attribute">("table");
+
+  const attributeRows = useMemo(
+    () =>
+      (results ?? []).flatMap((r, statementIndex) =>
+        r.column_lineage.map((c, columnIndex) => ({ ...c, statementIndex, columnIndex }))
+      ),
+    [results]
+  );
 
   async function parse() {
     setError(null);
@@ -31,6 +41,7 @@ export function Lineage() {
       const body = mode === "sql" ? { sql: code } : { code };
       const res = await api.post<LineageResult[]>(path, body);
       setResults(res);
+      setResultView("table");
     } catch (e) {
       setError(String(e));
       setResults(null);
@@ -86,38 +97,95 @@ export function Lineage() {
             <h3>Results</h3>
             <span className="card-header-meta">{results.length} statement{results.length === 1 ? "" : "s"}</span>
           </div>
-          {results.map((r, i) => (
-            <div key={i} style={{ marginBottom: 20 }}>
-              <p>
-                <span className="badge badge-neutral">{r.statement_type}</span>{" "}
-                {r.target_table && <strong>{r.target_table}</strong>} ← {r.source_tables.join(", ") || "—"}
-              </p>
-              <div className="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Target Column</th>
-                      <th>Source Table</th>
-                      <th>Source Column</th>
-                      <th>Transformation</th>
+
+          <div className="chip-row" style={{ marginBottom: 16 }}>
+            <button
+              className={`chip${resultView === "table" ? " active" : ""}`}
+              onClick={() => setResultView("table")}
+            >
+              Table Lineage
+            </button>
+            <button
+              className={`chip${resultView === "attribute" ? " active" : ""}`}
+              onClick={() => setResultView("attribute")}
+            >
+              Attribute Lineage ({attributeRows.length})
+            </button>
+          </div>
+
+          {resultView === "table" ? (
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Statement Type</th>
+                    <th>Target Table</th>
+                    <th>Source Tables</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((r, i) => (
+                    <tr key={i}>
+                      <td>{i + 1}</td>
+                      <td>
+                        <span className="badge badge-neutral">{r.statement_type}</span>
+                      </td>
+                      <td>{r.target_table ? <strong>{r.target_table}</strong> : "—"}</td>
+                      <td className="wrap">
+                        {r.source_tables.length > 0 ? (
+                          <div className="chip-row">
+                            {r.source_tables.map((t) => (
+                              <span key={t} className="chip" style={{ cursor: "default" }}>
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {r.column_lineage.map((c, j) => (
-                      <tr key={j}>
-                        <td>{c.target_column}</td>
-                        <td>{c.source_table ?? "—"}</td>
-                        <td>{c.source_column ?? "—"}</td>
-                        <td>
-                          <code>{c.transformation}</code>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
+          ) : attributeRows.length === 0 ? (
+            <EmptyState
+              icon="⛓"
+              title="No column-level lineage extracted"
+              subtitle="This statement type doesn't produce column-to-column mappings."
+            />
+          ) : (
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Target Table</th>
+                    <th>Target Column</th>
+                    <th>Source Table</th>
+                    <th>Source Column</th>
+                    <th>Transformation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attributeRows.map((c) => (
+                    <tr key={`${c.statementIndex}-${c.columnIndex}`}>
+                      <td>{c.statementIndex + 1}</td>
+                      <td>{c.target_table ?? "—"}</td>
+                      <td>{c.target_column}</td>
+                      <td>{c.source_table ?? "—"}</td>
+                      <td>{c.source_column ?? "—"}</td>
+                      <td>
+                        <code>{c.transformation}</code>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

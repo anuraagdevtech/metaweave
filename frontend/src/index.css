@@ -472,7 +472,11 @@ button {
   transition: all var(--transition);
 }
 
-button:hover:not(:disabled) {
+/* :not(.chip) so the chip/dag-node's own :hover rules (lower specificity
+   than this element+2-pseudo-class selector) aren't clobbered — without it,
+   hovering an active chip painted its background the same accent color as
+   its text, making the label unreadable. */
+button:hover:not(:disabled):not(.chip):not(.dag-node) {
   background: var(--accent-strong);
 }
 
@@ -791,7 +795,8 @@ button.btn-sm {
   border-color: var(--panel-border-hover);
 }
 
-.dag-node.selected {
+.dag-node.selected,
+.dag-node.selected:hover {
   border-color: var(--accent);
   background: var(--accent-dim);
 }

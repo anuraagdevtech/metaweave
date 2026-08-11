@@ -20,9 +20,23 @@ for the system topology and how it maps to that spec.
   - An NL query engine: a typed tool registry (Anthropic tool-calling
     schema) dispatched either through the Anthropic API or a deterministic
     regex fallback that works offline.
+  - A demo dataset (`app/seed_data.py`) of **120 real SQL task examples**
+    across 8 business domains (e-commerce, marketing, finance, logistics,
+    HR, support, product analytics, IoT) — incremental loads, SCD2, dedup,
+    rollups, ranking, funnel/cohort analysis, data quality checks, gap
+    filling, rate normalization, sessionization, anomaly detection and
+    governance deletes — each wired to a real workflow/job/task, run
+    history, alert routing, and dependency graph. It auto-seeds on first
+    run against the quick-start SQLite DB (see below); run it against
+    Postgres with `python backend/scripts/seed.py`. Browse it via the
+    `GET /sql-examples` endpoint or the frontend's SQL Examples page.
 - **Frontend** (`frontend/`) — React + TypeScript + Vite: a runbook
-  dashboard, job detail (task DAG + code viewer + run history + alerts), a
-  lineage parser UI, a blast-radius/RCA graph view, and an NL query box.
+  dashboard with live stats and job search, a searchable/filterable **SQL
+  Examples library** (syntax-highlighted, copy-to-clipboard, paginated), job
+  detail (clickable task DAG + code viewer + task dependencies + run
+  history + alerts), a lineage parser UI, a blast-radius/RCA graph view, and
+  an NL query box — with loading skeletons, empty states, and a responsive
+  layout throughout.
 
 ## Quick start (SQLite, no setup)
 
@@ -67,7 +81,7 @@ Or `docker compose up` to run backend + Postgres together (see
 ## Tests
 
 ```bash
-cd backend && pytest        # 21 tests: parsers, graph engine, full API flow
+cd backend && pytest        # 24 tests: parsers, graph engine, full API flow, seed dataset
 cd frontend && npm run build  # type-checks + bundles
 ```
 

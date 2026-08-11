@@ -109,3 +109,18 @@ class JobAlertOut(JobAlertCreate):
     alert_id: str
     created_at: dt.datetime
     updated_at: dt.datetime
+
+
+class SqlExampleOut(BaseModel):
+    """A SQL task flattened with its owning job/workflow, for the SQL library UI."""
+
+    task_id: str
+    task_name: str
+    category: str | None = None
+    description: str | None = None
+    sql: str
+    job_id: str
+    job_name: str
+    workflow_id: str
+    workflow_name: str
+    owner_team: str

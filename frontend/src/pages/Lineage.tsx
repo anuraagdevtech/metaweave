@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { Spinner } from "../components/Spinner";
-import type { LineageResult } from "../api/types";
+import type { LineageResult, SqlExample } from "../api/types";
 
 const SAMPLE_SQL = `INSERT INTO analytics.customer_summary (customer_id, total_orders, total_revenue)
 SELECT c.customer_id, COUNT(o.order_id) AS total_orders, SUM(o.amount) AS total_revenue
@@ -25,6 +25,40 @@ export function Lineage() {
   const [loading, setLoading] = useState(false);
   const [resultView, setResultView] = useState<"table" | "attribute">("table");
 
+  const [examples, setExamples] = useState<SqlExample[] | null>(null);
+  const [exampleSearch, setExampleSearch] = useState("");
+  const [exampleCategory, setExampleCategory] = useState("All");
+  const [selectedExampleId, setSelectedExampleId] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .get<SqlExample[]>("/sql-examples")
+      .then(setExamples)
+      .catch(() => {
+        /* the case browser is a convenience — parsing still works without it */
+      });
+  }, []);
+
+  const exampleCategories = useMemo(() => {
+    if (!examples) return [];
+    return Array.from(new Set(examples.map((e) => e.category).filter((c): c is string => Boolean(c)))).sort();
+  }, [examples]);
+
+  const filteredExamples = useMemo(() => {
+    if (!examples) return [];
+    const q = exampleSearch.trim().toLowerCase();
+    return examples.filter((e) => {
+      if (exampleCategory !== "All" && e.category !== exampleCategory) return false;
+      if (!q) return true;
+      return (
+        e.task_name.toLowerCase().includes(q) ||
+        (e.description ?? "").toLowerCase().includes(q) ||
+        e.job_name.toLowerCase().includes(q) ||
+        e.workflow_name.toLowerCase().includes(q)
+      );
+    });
+  }, [examples, exampleSearch, exampleCategory]);
+
   const attributeRows = useMemo(
     () =>
       (results ?? []).flatMap((r, statementIndex) =>
@@ -33,12 +67,12 @@ export function Lineage() {
     [results]
   );
 
-  async function parse() {
+  async function runParse(sourceCode: string, sourceMode: "sql" | "pyspark") {
     setError(null);
     setLoading(true);
     try {
-      const path = mode === "sql" ? "/lineage/parse-sql" : "/lineage/parse-pyspark";
-      const body = mode === "sql" ? { sql: code } : { code };
+      const path = sourceMode === "sql" ? "/lineage/parse-sql" : "/lineage/parse-pyspark";
+      const body = sourceMode === "sql" ? { sql: sourceCode } : { code: sourceCode };
       const res = await api.post<LineageResult[]>(path, body);
       setResults(res);
       setResultView("table");
@@ -50,16 +84,94 @@ export function Lineage() {
     }
   }
 
+  function loadExample(example: SqlExample) {
+    setSelectedExampleId(example.task_id);
+    setMode("sql");
+    setCode(example.sql);
+    runParse(example.sql, "sql");
+  }
+
   return (
     <div>
       <div className="page-header">
         <div>
           <h2>Lineage Parser</h2>
           <p className="page-subtitle">
-            Paste a SQL statement or PySpark script to extract table- and column-level lineage.
+            Paste a SQL statement or PySpark script — or load one of {examples?.length ?? "120+"} real production
+            cases below — to extract table- and column-level lineage.
           </p>
         </div>
       </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h3>Browse example cases</h3>
+          <span className="card-header-meta">
+            {examples ? `${filteredExamples.length} of ${examples.length}` : <Spinner label="Loading cases…" />}
+          </span>
+        </div>
+
+        {examples && (
+          <>
+            <div className="search-field" style={{ marginBottom: 10 }}>
+              <input
+                value={exampleSearch}
+                onChange={(e) => setExampleSearch(e.target.value)}
+                placeholder="Search cases by task, job, or workflow…"
+              />
+            </div>
+            <div className="chip-row" style={{ marginBottom: 12 }}>
+              <button
+                className={`chip${exampleCategory === "All" ? " active" : ""}`}
+                onClick={() => setExampleCategory("All")}
+              >
+                All ({examples.length})
+              </button>
+              {exampleCategories.map((cat) => (
+                <button
+                  key={cat}
+                  className={`chip${exampleCategory === cat ? " active" : ""}`}
+                  onClick={() => setExampleCategory(cat)}
+                >
+                  {cat} ({examples.filter((e) => e.category === cat).length})
+                </button>
+              ))}
+            </div>
+
+            {filteredExamples.length === 0 ? (
+              <EmptyState icon="⌕" title="No cases match your filters" />
+            ) : (
+              <div style={{ maxHeight: 280, overflowY: "auto", paddingRight: 4 }}>
+                {filteredExamples.map((example) => (
+                  <button
+                    key={example.task_id}
+                    className="btn-secondary"
+                    onClick={() => loadExample(example)}
+                    disabled={loading}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      marginTop: 6,
+                      borderColor: example.task_id === selectedExampleId ? "var(--accent)" : undefined,
+                      background: example.task_id === selectedExampleId ? "var(--accent-dim)" : undefined,
+                    }}
+                  >
+                    <span style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                      <span>{example.task_name}</span>
+                      {example.category && <span className="badge badge-accent">{example.category}</span>}
+                    </span>
+                    <span className="example-card-path">
+                      {example.workflow_name} / {example.job_name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       <div className="card">
         <div className="dag-row">
           <button
@@ -67,6 +179,7 @@ export function Lineage() {
             onClick={() => {
               setMode("sql");
               setCode(SAMPLE_SQL);
+              setSelectedExampleId(null);
             }}
           >
             SQL
@@ -76,15 +189,22 @@ export function Lineage() {
             onClick={() => {
               setMode("pyspark");
               setCode(SAMPLE_PYSPARK);
+              setSelectedExampleId(null);
             }}
           >
             PySpark
           </button>
         </div>
         <label className="field-label">{mode === "sql" ? "SQL statement(s)" : "PySpark script"}</label>
-        <textarea value={code} onChange={(e) => setCode(e.target.value)} />
+        <textarea
+          value={code}
+          onChange={(e) => {
+            setCode(e.target.value);
+            setSelectedExampleId(null);
+          }}
+        />
         <div>
-          <button onClick={parse} disabled={loading || !code.trim()}>
+          <button onClick={() => runParse(code, mode)} disabled={loading || !code.trim()}>
             {loading ? <Spinner label="Parsing…" /> : "Extract Lineage"}
           </button>
         </div>

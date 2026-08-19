@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { SqlExample } from "../api/types";
 import { CodeViewer } from "../components/CodeViewer";
+import { ComplexityBadges } from "../components/ComplexityBadges";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { Pagination } from "../components/Pagination";
@@ -16,6 +17,7 @@ export function SqlExamples() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("All");
+  const [domain, setDomain] = useState<"all" | "banking" | "patterns">("all");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -25,20 +27,32 @@ export function SqlExamples() {
       .catch((e) => setError(String(e)));
   }, []);
 
-  const categories = useMemo(() => {
-    if (!examples) return [];
-    return Array.from(new Set(examples.map((e) => e.category).filter((c): c is string => Boolean(c)))).sort();
-  }, [examples]);
+  const inDomain = useMemo(
+    () => (e: SqlExample) =>
+      domain === "all" || (domain === "banking" ? e.domain === "banking" : e.domain !== "banking"),
+    [domain]
+  );
 
-  const workflowCount = useMemo(
-    () => (examples ? new Set(examples.map((e) => e.workflow_id)).size : 0),
+  const domainScoped = useMemo(() => (examples ?? []).filter(inDomain), [examples, inDomain]);
+
+  const categories = useMemo(
+    () => Array.from(new Set(domainScoped.map((e) => e.category).filter((c): c is string => Boolean(c)))).sort(),
+    [domainScoped]
+  );
+
+  const bankingCount = useMemo(
+    () => (examples ?? []).filter((e) => e.domain === "banking").length,
     [examples]
   );
 
+  const workflowCount = useMemo(
+    () => new Set(domainScoped.map((e) => e.workflow_id)).size,
+    [domainScoped]
+  );
+
   const filtered = useMemo(() => {
-    if (!examples) return [];
     const q = search.trim().toLowerCase();
-    return examples.filter((e) => {
+    return domainScoped.filter((e) => {
       if (category !== "All" && e.category !== category) return false;
       if (!q) return true;
       return (
@@ -49,7 +63,7 @@ export function SqlExamples() {
         e.workflow_name.toLowerCase().includes(q)
       );
     });
-  }, [examples, search, category]);
+  }, [domainScoped, search, category]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -66,8 +80,10 @@ export function SqlExamples() {
         <div>
           <h2>SQL Examples Library</h2>
           <p className="page-subtitle">
-            Real, runnable SQL patterns — incremental loads, SCD2, dedup, rollups, funnels, anomaly
-            detection and more — each tied to the job and task that runs it in production.
+            Real, runnable SQL — {bankingCount} complex bank finance cases (deposits, loans, FTP, net interest
+            income, cost allocation, P&amp;L, RWA, ALM and regulatory reporting, each a multi-CTE join across
+            positions, dimensions and reference data) plus a general pattern library — every one tied to the
+            job and task that runs it in production.
           </p>
         </div>
       </div>
@@ -84,11 +100,36 @@ export function SqlExamples() {
         <>
           <div className="stat-grid">
             <StatTile value={examples.length} label="SQL examples" />
-            <StatTile value={categories.length} label="Pattern categories" />
+            <StatTile value={bankingCount} label="Complex banking cases" />
+            <StatTile value={categories.length} label="Categories" />
             <StatTile value={workflowCount} label="Workflows covered" />
           </div>
 
           <div className="card">
+            <label className="field-label">Library</label>
+            <div className="domain-toggle">
+              {(
+                [
+                  ["all", `All (${examples.length})`],
+                  ["banking", `Banking — complex joins (${bankingCount})`],
+                  ["patterns", `Pattern library (${examples.length - bankingCount})`],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  className={`chip${domain === key ? " active" : ""}`}
+                  onClick={() =>
+                    onFilterChange(() => {
+                      setDomain(key);
+                      setCategory("All");
+                    })
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <label className="field-label">Search</label>
             <div className="search-field">
               <input
@@ -104,7 +145,7 @@ export function SqlExamples() {
                 className={`chip${category === "All" ? " active" : ""}`}
                 onClick={() => onFilterChange(() => setCategory("All"))}
               >
-                All ({examples.length})
+                All ({domainScoped.length})
               </button>
               {categories.map((cat) => (
                 <button
@@ -112,7 +153,7 @@ export function SqlExamples() {
                   className={`chip${category === cat ? " active" : ""}`}
                   onClick={() => onFilterChange(() => setCategory(cat))}
                 >
-                  {cat} ({examples.filter((e) => e.category === cat).length})
+                  {cat} ({domainScoped.filter((e) => e.category === cat).length})
                 </button>
               ))}
             </div>
@@ -148,6 +189,7 @@ export function SqlExamples() {
                         / {example.job_name}
                       </div>
                       {example.description && <p className="example-card-desc">{example.description}</p>}
+                      <ComplexityBadges complexity={example.complexity} />
                     </summary>
                     <CodeViewer code={example.sql} language="SQL" />
                   </details>

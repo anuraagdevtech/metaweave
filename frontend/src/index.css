@@ -846,3 +846,29 @@ button.btn-sm {
     padding: var(--space-4);
   }
 }
+
+/* ----------------------------------------------------- complexity strip */
+
+.complexity-strip {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.complexity-strip strong {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.complexity-sep {
+  margin: 0 6px;
+  opacity: 0.5;
+}
+
+.domain-toggle {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}

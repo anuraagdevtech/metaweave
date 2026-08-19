@@ -111,6 +111,15 @@ class JobAlertOut(JobAlertCreate):
     updated_at: dt.datetime
 
 
+class SqlComplexity(BaseModel):
+    """Structural shape of a statement — how many CTEs/joins/tables it spans."""
+
+    ctes: int = 0
+    joins: int = 0
+    tables: int = 0
+    lines: int = 0
+
+
 class SqlExampleOut(BaseModel):
     """A SQL task flattened with its owning job/workflow, for the SQL library UI."""
 
@@ -118,6 +127,8 @@ class SqlExampleOut(BaseModel):
     task_name: str
     category: str | None = None
     description: str | None = None
+    domain: str | None = None
+    complexity: SqlComplexity | None = None
     sql: str
     job_id: str
     job_name: str

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
+import { ComplexityBadges } from "../components/ComplexityBadges";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { Spinner } from "../components/Spinner";
@@ -27,6 +28,7 @@ export function Lineage() {
 
   const [examples, setExamples] = useState<SqlExample[] | null>(null);
   const [exampleSearch, setExampleSearch] = useState("");
+  const [exampleDomain, setExampleDomain] = useState<"banking" | "all">("banking");
   const [exampleCategory, setExampleCategory] = useState("All");
   const [selectedExampleId, setSelectedExampleId] = useState<string | null>(null);
 
@@ -39,15 +41,24 @@ export function Lineage() {
       });
   }, []);
 
-  const exampleCategories = useMemo(() => {
-    if (!examples) return [];
-    return Array.from(new Set(examples.map((e) => e.category).filter((c): c is string => Boolean(c)))).sort();
-  }, [examples]);
+  const domainExamples = useMemo(
+    () => (examples ?? []).filter((e) => exampleDomain === "all" || e.domain === "banking"),
+    [examples, exampleDomain]
+  );
+
+  const bankingCount = useMemo(
+    () => (examples ?? []).filter((e) => e.domain === "banking").length,
+    [examples]
+  );
+
+  const exampleCategories = useMemo(
+    () => Array.from(new Set(domainExamples.map((e) => e.category).filter((c): c is string => Boolean(c)))).sort(),
+    [domainExamples]
+  );
 
   const filteredExamples = useMemo(() => {
-    if (!examples) return [];
     const q = exampleSearch.trim().toLowerCase();
-    return examples.filter((e) => {
+    return domainExamples.filter((e) => {
       if (exampleCategory !== "All" && e.category !== exampleCategory) return false;
       if (!q) return true;
       return (
@@ -57,7 +68,7 @@ export function Lineage() {
         e.workflow_name.toLowerCase().includes(q)
       );
     });
-  }, [examples, exampleSearch, exampleCategory]);
+  }, [domainExamples, exampleSearch, exampleCategory]);
 
   const attributeRows = useMemo(
     () =>
@@ -97,8 +108,9 @@ export function Lineage() {
         <div>
           <h2>Lineage Parser</h2>
           <p className="page-subtitle">
-            Paste a SQL statement or PySpark script — or load one of {examples?.length ?? "120+"} real production
-            cases below — to extract table- and column-level lineage.
+            Paste a SQL statement or PySpark script — or load one of {bankingCount || "50+"} complex bank
+            finance cases below (multi-CTE joins across deposits, loans, FTP, allocations, P&amp;L, RWA and
+            regulatory reporting) — to extract table- and column-level lineage.
           </p>
         </div>
       </div>
@@ -107,7 +119,7 @@ export function Lineage() {
         <div className="card-header">
           <h3>Browse example cases</h3>
           <span className="card-header-meta">
-            {examples ? `${filteredExamples.length} of ${examples.length}` : <Spinner label="Loading cases…" />}
+            {examples ? `${filteredExamples.length} of ${domainExamples.length}` : <Spinner label="Loading cases…" />}
           </span>
         </div>
 
@@ -120,12 +132,32 @@ export function Lineage() {
                 placeholder="Search cases by task, job, or workflow…"
               />
             </div>
+            <div className="domain-toggle">
+              <button
+                className={`chip${exampleDomain === "banking" ? " active" : ""}`}
+                onClick={() => {
+                  setExampleDomain("banking");
+                  setExampleCategory("All");
+                }}
+              >
+                Banking — complex joins ({bankingCount})
+              </button>
+              <button
+                className={`chip${exampleDomain === "all" ? " active" : ""}`}
+                onClick={() => {
+                  setExampleDomain("all");
+                  setExampleCategory("All");
+                }}
+              >
+                All cases ({examples.length})
+              </button>
+            </div>
             <div className="chip-row" style={{ marginBottom: 12 }}>
               <button
                 className={`chip${exampleCategory === "All" ? " active" : ""}`}
                 onClick={() => setExampleCategory("All")}
               >
-                All ({examples.length})
+                All ({domainExamples.length})
               </button>
               {exampleCategories.map((cat) => (
                 <button
@@ -133,7 +165,7 @@ export function Lineage() {
                   className={`chip${exampleCategory === cat ? " active" : ""}`}
                   onClick={() => setExampleCategory(cat)}
                 >
-                  {cat} ({examples.filter((e) => e.category === cat).length})
+                  {cat} ({domainExamples.filter((e) => e.category === cat).length})
                 </button>
               ))}
             </div>
@@ -161,8 +193,11 @@ export function Lineage() {
                       <span>{example.task_name}</span>
                       {example.category && <span className="badge badge-accent">{example.category}</span>}
                     </span>
-                    <span className="example-card-path">
-                      {example.workflow_name} / {example.job_name}
+                    <span style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 12, marginTop: 2 }}>
+                      <span className="example-card-path">
+                        {example.workflow_name} / {example.job_name}
+                      </span>
+                      <ComplexityBadges complexity={example.complexity} />
                     </span>
                   </button>
                 ))}

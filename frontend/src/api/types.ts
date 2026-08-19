@@ -117,11 +117,20 @@ export interface NLQueryResponse {
   tool_calls: NLQueryToolCall[];
 }
 
+export interface SqlComplexity {
+  ctes: number;
+  joins: number;
+  tables: number;
+  lines: number;
+}
+
 export interface SqlExample {
   task_id: string;
   task_name: string;
   category: string | null;
   description: string | null;
+  domain: string | null;
+  complexity: SqlComplexity | null;
   sql: string;
   job_id: string;
   job_name: string;

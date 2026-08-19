@@ -658,5 +658,12 @@ def seed_demo_data(db: Session) -> int:
         for task in stage_tasks["governance"]:
             db.add(JobDependency(task_id=task.task_id, depends_on_kind=DependencyKind.TASK, depends_on_task_id=last_analytics_task.task_id))
 
+    # The complex bank finance/treasury library (multi-CTE, multi-join
+    # statements over deposits, loans, FTP, allocations, P&L, RWA, ALM and
+    # regulatory reporting) shares the same tables and endpoints.
+    from app.seed_banking import seed_banking_data
+
+    sql_task_count += seed_banking_data(db)
+
     db.commit()
     return sql_task_count

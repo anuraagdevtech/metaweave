@@ -55,6 +55,17 @@ export interface JobAudit {
   created_at: string;
 }
 
+export type DependencyKind = "TASK" | "DATASET";
+
+export interface JobDependency {
+  dependency_id: string;
+  task_id: string;
+  depends_on_kind: DependencyKind;
+  depends_on_task_id: string | null;
+  depends_on_table: string | null;
+  created_at: string;
+}
+
 export interface JobAlert {
   alert_id: string;
   job_id: string;
@@ -104,4 +115,26 @@ export interface NLQueryToolCall {
 export interface NLQueryResponse {
   answer: string;
   tool_calls: NLQueryToolCall[];
+}
+
+export interface SqlComplexity {
+  ctes: number;
+  joins: number;
+  tables: number;
+  lines: number;
+}
+
+export interface SqlExample {
+  task_id: string;
+  task_name: string;
+  category: string | null;
+  description: string | null;
+  domain: string | null;
+  complexity: SqlComplexity | null;
+  sql: string;
+  job_id: string;
+  job_name: string;
+  workflow_id: string;
+  workflow_name: string;
+  owner_team: string;
 }

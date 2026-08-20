@@ -54,6 +54,32 @@ def _alias_map(root: exp.Expression) -> dict[str, str]:
     return mapping
 
 
+def _cte_names(root: exp.Expression) -> set[str]:
+    """Names bound by `WITH` clauses anywhere in the statement.
+
+    A reference to a CTE parses as an `exp.Table`, so without this it would be
+    reported as a physical source table — badly misleading on the multi-CTE
+    statements that dominate real warehouse SQL (a 6-CTE query would list 6
+    tables that don't exist). CTE names still resolve in the alias map so
+    column-level lineage can attribute a column to the CTE it came from.
+    """
+    return {cte.alias_or_name for cte in root.find_all(exp.CTE)}
+
+
+def _physical_sources(alias_map: dict[str, str], root: exp.Expression) -> list[str]:
+    """Distinct physical tables read, excluding intermediate CTE names.
+
+    Walks the `Table` nodes directly rather than reading `alias_map.values()`:
+    the alias map is one flat dict, so an alias reused in two scopes (a real
+    statement may say `FROM fact.loan_balance_daily l` in one CTE and
+    `JOIN liability_side l` in another) collapses to a single entry and would
+    silently drop a source table from the result.
+    """
+    del alias_map  # kept for call-site symmetry; sources come from the tree
+    ctes = _cte_names(root)
+    return sorted({_table_name(t) for t in root.find_all(exp.Table)} - ctes)
+
+
 def _column_sources(expr: exp.Expression, alias_map: dict[str, str]) -> list[tuple[str | None, str]]:
     cols = list(expr.find_all(exp.Column))
     if not cols:
@@ -138,7 +164,7 @@ def parse_sql_lineage(sql: str, dialect: str = "postgres") -> LineageResult:
         alias_map = _alias_map(source)
         return LineageResult(
             statement_type="INSERT",
-            source_tables=sorted(set(alias_map.values())),
+            source_tables=_physical_sources(alias_map, source),
             target_table=target_table,
             column_lineage=_select_lineage(source, target_table, declared_cols, alias_map),
         )
@@ -147,7 +173,7 @@ def parse_sql_lineage(sql: str, dialect: str = "postgres") -> LineageResult:
         target_table = _table_name(tree.this)
         using = tree.args.get("using")
         alias_map = _alias_map(using) if using is not None else {}
-        source_tables = sorted(set(alias_map.values()))
+        source_tables = _physical_sources(alias_map, using) if using is not None else []
         return LineageResult(
             statement_type="MERGE",
             source_tables=source_tables,
@@ -167,7 +193,7 @@ def parse_sql_lineage(sql: str, dialect: str = "postgres") -> LineageResult:
         alias_map = _alias_map(source)
         return LineageResult(
             statement_type="CREATE_TABLE_AS",
-            source_tables=sorted(set(alias_map.values())),
+            source_tables=_physical_sources(alias_map, source),
             target_table=target_table,
             column_lineage=_select_lineage(source, target_table, declared_cols, alias_map),
         )
@@ -176,7 +202,7 @@ def parse_sql_lineage(sql: str, dialect: str = "postgres") -> LineageResult:
         alias_map = _alias_map(tree)
         return LineageResult(
             statement_type="SELECT",
-            source_tables=sorted(set(alias_map.values())),
+            source_tables=_physical_sources(alias_map, tree),
             target_table=None,
             column_lineage=_select_lineage(tree, None, None, alias_map),
         )

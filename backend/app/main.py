@@ -18,10 +18,11 @@ from app.api import (
     routes_jobs,
     routes_lineage,
     routes_nl_query,
+    routes_sql_examples,
     routes_workflows,
 )
 from app.core.config import settings
-from app.core.db import init_db
+from app.core.db import SessionLocal, init_db
 
 
 @asynccontextmanager
@@ -29,6 +30,17 @@ async def lifespan(app: FastAPI):
     if settings.is_sqlite:
         # Convenience for local dev/tests only — Postgres schema is owned by Alembic.
         init_db()
+        if settings.environment != "test":
+            # Populate the quick-start SQLite DB with the demo dataset (100+ SQL
+            # task examples across realistic workflows/jobs) so the UI has
+            # something to show on first run. No-ops if data already exists.
+            from app.seed_data import seed_demo_data
+
+            db = SessionLocal()
+            try:
+                seed_demo_data(db)
+            finally:
+                db.close()
     yield
 
 
@@ -51,6 +63,7 @@ app.include_router(routes_jobs.router)
 app.include_router(routes_lineage.router)
 app.include_router(routes_blast_radius.router)
 app.include_router(routes_nl_query.router)
+app.include_router(routes_sql_examples.router)
 
 
 @app.get("/health")

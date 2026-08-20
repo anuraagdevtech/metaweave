@@ -20,9 +20,37 @@ for the system topology and how it maps to that spec.
   - An NL query engine: a typed tool registry (Anthropic tool-calling
     schema) dispatched either through the Anthropic API or a deterministic
     regex fallback that works offline.
+  - A demo dataset of **175 real SQL task examples**, each wired to a real
+    workflow/job/task, run history, alert routing and dependency graph:
+    - **55 complex bank finance/treasury cases** (`app/seed_banking.py`) —
+      deposit and loan position facts, tiered interest accrual, funds
+      transfer pricing, IFRS 9 staging and ECL provisioning, net interest
+      income with volume/rate/mix attribution, expense pools, driver-based /
+      step-down / **reciprocal (recursive CTE)** cost allocation, full P&L
+      waterfalls, product/branch/customer profitability, RWA, economic
+      capital and RAROC, repricing gap, LCR, EVE sensitivity, and Call
+      Report / FR Y-9C / IFRS 9 / Basel leverage submissions. Every one is a
+      genuine multi-CTE, multi-join statement (avg 3.4 CTEs, 5.1 joins, 9.8
+      tables; up to 12 joins across 17 tables) over a realistic
+      `core`/`gl`/`dim`/`ref`/`fact`/`finance`/`risk`/`alm`/`reg` schema.
+    - **120 general pattern examples** (`app/seed_data.py`) across 8 business
+      domains — incremental loads, SCD2, dedup, rollups, ranking,
+      funnel/cohort analysis, data quality checks, gap filling,
+      normalization, sessionization, anomaly detection, governance deletes.
+
+    It auto-seeds on first run against the quick-start SQLite DB (see below);
+    run it against Postgres with `python backend/scripts/seed.py`. Browse it
+    via the `GET /sql-examples` endpoint (which reports each statement's
+    CTE/join/table counts) or the frontend's SQL Examples and Lineage pages.
 - **Frontend** (`frontend/`) — React + TypeScript + Vite: a runbook
-  dashboard, job detail (task DAG + code viewer + run history + alerts), a
-  lineage parser UI, a blast-radius/RCA graph view, and an NL query box.
+  dashboard with live stats and job search, a searchable/filterable **SQL
+  Examples library** (syntax-highlighted, copy-to-clipboard, paginated, with
+  per-statement CTE/join/table complexity), job detail (clickable task DAG +
+  code viewer + task dependencies + run history + alerts), a lineage parser
+  with a browsable case library and separate **Table Lineage** and
+  **Attribute Lineage** tabs, a blast-radius/RCA graph view, and an NL query
+  box — with loading skeletons, empty states, and a responsive layout
+  throughout.
 
 ## Quick start (SQLite, no setup)
 
@@ -67,7 +95,7 @@ Or `docker compose up` to run backend + Postgres together (see
 ## Tests
 
 ```bash
-cd backend && pytest        # 21 tests: parsers, graph engine, full API flow
+cd backend && pytest        # 27 tests: parsers, graph engine, full API flow, seed + banking datasets
 cd frontend && npm run build  # type-checks + bundles
 ```
 

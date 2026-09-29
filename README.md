@@ -52,6 +52,56 @@ for the system topology and how it maps to that spec.
   box — with loading skeletons, empty states, and a responsive layout
   throughout.
 
+## The `metaweave` extraction tool
+
+MetaWeave is also a command line tool. Point it at a repository and it
+recovers all three lineage levels in one pass — statically, without importing
+a DAG, executing SQL, or connecting to a warehouse:
+
+| Level | Recovered from | What you get |
+| --- | --- | --- |
+| **Job lineage** | orchestration definitions | jobs, their tasks, task→task edges, cross-job dependencies, schedules, owners |
+| **Table lineage** | the code each task runs | which tables every task reads and writes |
+| **Attribute lineage** | the same code | column→column mappings with the transforming expression |
+
+```bash
+cd backend
+pip install -e .
+
+metaweave extract ../path/to/your-repo               # all three levels
+metaweave extract ./repo --level job                 # just the orchestration graph
+metaweave extract ./repo --level attribute           # just column lineage
+metaweave extract ./repo --format json --out lineage.json
+metaweave extract ./repo --push http://localhost:8000   # load into the API/UI
+metaweave lineage path/to/query.sql                  # one file
+```
+
+### What it understands
+
+- **Airflow** (`*.py`) — `DAG(...)`, `with DAG(...)`, and `@dag`; tasks from any
+  `*Operator`/`*Sensor` call and TaskFlow `@task` functions; dependencies from
+  `>>`/`<<` chains including list fan-out/fan-in, `.set_upstream()`/
+  `.set_downstream()` and `chain(...)`; cross-DAG edges from
+  `ExternalTaskSensor(external_dag_id=)` and `TriggerDagRunOperator(trigger_dag_id=)`;
+  Dataset inlets/outlets; module-level `default_args` resolved by name. Task code
+  is followed to the referenced `.sql` file or Spark `application=` and parsed.
+- **dbt** — a compiled `target/manifest.json` (authoritative, with compiled SQL),
+  or an uncompiled `dbt_project.yml` + `models/**/*.sql` by reading `{{ ref() }}`
+  and `{{ source() }}` directly.
+- **Databricks / Workflows** — Jobs API 2.1 JSON or YAML and Asset Bundles:
+  `tasks[].task_key`, `depends_on`, `notebook_task`/`spark_python_task`/
+  `sql_task`/`dbt_task`, schedules and `run_job_task` fan-out.
+- **Loose SQL and PySpark** files that no orchestrator references, grouped by
+  directory and flagged as unorchestrated.
+
+Beyond what each orchestrator declares, the tool also infers job→job edges
+wherever one job writes a table another job reads — the implicit coupling that
+causes most cross-team breakage.
+
+Anything that cannot be resolved statically (a computed `dag_id`, a task built
+in a loop, an uncompiled Jinja template) is reported as a warning rather than
+guessed at; `--fail-on-warning` makes that a non-zero exit for CI.
+
 ## Quick start (SQLite, no setup)
 
 ```bash
@@ -95,7 +145,7 @@ Or `docker compose up` to run backend + Postgres together (see
 ## Tests
 
 ```bash
-cd backend && pytest        # 27 tests: parsers, graph engine, full API flow, seed + banking datasets
+cd backend && pytest        # 41 tests: parsers, extraction tool, graph engine, API flow, seed data
 cd frontend && npm run build  # type-checks + bundles
 ```
 

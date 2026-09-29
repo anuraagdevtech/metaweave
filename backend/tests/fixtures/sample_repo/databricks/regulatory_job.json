@@ -1,0 +1,20 @@
+{
+  "name": "regulatory_reporting",
+  "schedule": {"quartz_cron_expression": "0 0 5 * * ?", "timezone_id": "UTC"},
+  "tags": {"domain": "regulatory"},
+  "tasks": [
+    {
+      "task_key": "build_call_report",
+      "sql_task": {
+        "query": {
+          "query": "INSERT INTO reg.call_report_rc_c (report_date, line_item, total_amount) SELECT f.as_of_date, m.line_item, SUM(f.outstanding_principal) FROM fact.loan_balance_daily f JOIN ref.rc_c_mapping m ON m.product_class = f.product_class GROUP BY f.as_of_date, m.line_item"
+        }
+      }
+    },
+    {
+      "task_key": "validate_submission",
+      "depends_on": [{"task_key": "build_call_report"}],
+      "notebook_task": {"notebook_path": "/Repos/reg/validate_rc_c"}
+    }
+  ]
+}

@@ -13,3 +13,4 @@ dist/
 # Env
 .env
 .env.local
+*.egg-info/

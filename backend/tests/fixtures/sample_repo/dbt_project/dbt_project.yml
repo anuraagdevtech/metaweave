@@ -1,0 +1,7 @@
+name: bank_marts
+version: "1.0.0"
+profile: bank_marts
+model-paths: ["models"]
+models:
+  bank_marts:
+    +schema: mart

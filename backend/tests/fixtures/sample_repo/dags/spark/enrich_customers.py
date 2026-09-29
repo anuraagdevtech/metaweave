@@ -1,0 +1,5 @@
+customers = spark.table("core.customer_master")
+segments = spark.table("ref.customer_segment")
+joined = customers.join(segments, "segment_code")
+enriched = joined.withColumn("risk_tier", col("credit_score"))
+enriched.write.format("delta").mode("overwrite").saveAsTable("dim.dim_customer")
